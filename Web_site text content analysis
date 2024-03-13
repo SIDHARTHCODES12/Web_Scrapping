@@ -1,0 +1,367 @@
+import pandas as pd
+
+
+# Specify the path to your CSV file
+input_file_path = '/content/Input.csv'
+input = pd.read_csv(input_file_path)
+output_file_path="/content/Output Data Structure.csv"
+output=pd.read_csv(output_file_path)
+# Read the CSV file into a DataFrame
+
+input=input.dropna()
+urls=input.URL
+
+rnum=-1
+for url in urls:
+  rnum+=1
+  print(rnum)
+
+
+  #print("row number =",rnum)
+
+  output_file_path="/content/Output Data Structure.csv"
+  output=pd.read_csv(output_file_path)
+
+  """# ***Extracting article headline and content***"""
+
+  import requests
+  from bs4 import BeautifulSoup
+
+  def extract(url):
+
+    response=requests.get(url)
+    if response.status_code==200:
+      soup=BeautifulSoup(response.text,'html.parser')
+
+      headline=soup.find('h1').get_text() if soup.find('h1') else None
+
+      text=soup.find('div',class_='td-post-content tagdiv-type').get_text() if soup.find('div',class_='td-post-content tagdiv-type') else None
+
+      if text==None:
+        article_content_elements = soup.find_all('div', class_='tdb-block-inner td-fix-index')
+        text = ''
+        for element in article_content_elements:
+            text += element.get_text(separator='\n')
+
+
+      return headline,text
+
+    else :
+      print("Failed to retrieve the webpage")
+      return None,None
+
+
+  headline,article_text=extract(url)
+
+  if article_text==None :
+    continue
+
+  # text with headline and content
+  text_content = headline + article_text
+
+  #print(text_content)
+
+  #Average Sentence Length
+  words=text_content.split()
+  word_count=0
+  for i in words:
+
+    word_count+=1
+
+  sentence_count=0
+  sentence= text_content.split('.')
+  for i in sentence:
+
+    sentence_count+=1
+
+  average_sentence_length = word_count/sentence_count
+  #print("...............................................")
+  #print("Average Sentence Length = ",average_sentence_length)
+  #print("...............................................")
+  output.loc[rnum,'AVG SENTENCE LENGTH']=average_sentence_length
+
+
+  #removing punctuations
+  import nltk
+  from nltk.corpus import stopwords
+  from nltk.tokenize import word_tokenize
+
+  nltk.download('stopwords')
+  nltk.download('punkt')
+
+
+  # Tokenize the text into words
+  words = word_tokenize(text_content)
+
+
+  punctuation = ['?','!',',','.',':','-']
+
+  filtered_words=[word for word in words if word.lower() not in punctuation]
+  text_content=' '.join(filtered_words)
+
+  """# ***Data Cleaning***"""
+
+  #data cleaning
+  stopwords_currencies = '/content/StopWords_Currencies.txt'
+
+  # Open the file in read mode
+  with open(stopwords_currencies, 'r', encoding='latin-1') as file:
+      # Read the content of the file
+      stopwords_currencies = file.read()
+  stopwords_currencies=stopwords_currencies.split("\n")
+
+  for i in stopwords_currencies:
+    if i in text_content:
+      text_content = text_content.replace(i, '')
+
+  stopwords_auditor = '/content/StopWords_Auditor.txt'
+
+  # Open the file in read mode
+  with open(stopwords_auditor, 'r', encoding='latin-1') as file:
+      # Read the content of the file
+      stopwords_auditor = file.read()
+  stopwords_auditor=stopwords_auditor.split("\n")
+
+  for i in stopwords_auditor:
+    if i in text_content:
+      text_content = text_content.replace(i, '')
+
+  #print (text_content)
+
+  """# ***Finding the variables***"""
+
+  #positive Score
+
+  positive_score=0
+
+  positive_words="/content/positive-words.txt"
+
+  #opening text file saved in notepad
+  with open(positive_words,'r',encoding='utf-8') as file:
+    positive_words=file.read()
+
+  words = text_content.split()
+
+  # Print each word
+  for i in words:
+
+        if i in positive_words:
+          positive_score +=1
+  #print("positive Score = ",positive_score)
+  output.loc[rnum,'POSITIVE SCORE']=positive_score
+
+  # Negative Score
+
+  negative_score=0
+
+  negative_words="/content/negative-words.txt"
+
+  #opening text file saved in notepad
+  with open(negative_words,'r',encoding='latin-1') as file:
+    negative_words=file.read()
+
+  words = text_content.split()
+
+  # Print each word
+  for i in words:
+
+        if i in negative_words:
+          negative_score +=1
+
+  #print("Negative Score = ",negative_score)
+  output.loc[rnum,'NEGATIVE SCORE']=negative_score
+
+  #Polarity Score
+  polarity_score = (positive_score-negative_score)/((positive_score+negative_score)+0.000001)
+  #print("Polarity Score = ",polarity_score)
+  output.loc[rnum,'POLARITY SCORE']=polarity_score
+
+  #Subjectivity Score = (Positive Score + Negative Score)/ ((Total Words after cleaning) + 0.000001)
+
+  #counting no of words after cleaning
+  word_count=0
+  for i in words:
+
+    word_count+=1
+  #print("word count = " , word_count)
+
+  #print subjectivity score
+
+  Subjectivity_Score = (positive_score+negative_score)/ ((word_count) + 0.000001)
+
+  #print("Subjectivity_Score = ",Subjectivity_Score)
+  output.loc[rnum,'SUBJECTIVITY SCORE']=Subjectivity_Score
+
+  #Percentage of Complex words = the number of complex words / the number of words
+
+  complex_word_count=0
+  vowel=['a','e','i','o','u','A','E','I','O','U']
+  for i in words :
+
+    syllable_count=0
+    if i.endswith("es")or i.endswith("ed"):
+      continue
+    else :
+      #checking how many vowels  in a word and incrementing the syllable count
+      for j in i:
+        if j in vowel:
+          syllable_count += 1
+      if syllable_count>2 :
+
+        complex_word_count+=1
+  percentage_of_complex_words=complex_word_count/word_count
+  #print("percentage_of_complex_words = ",percentage_of_complex_words)
+  output.loc[rnum,'PERCENTAGE OF COMPLEX WORDS']=percentage_of_complex_words
+
+  #Fog Index
+  fog_index=0.4*(average_sentence_length+percentage_of_complex_words)
+  #print("Fog Index = ",fog_index)
+
+  #Average Number of Words Per Sentence = the total number of words / the total number of sentences
+  average_number_of_words_per_sentence = word_count/sentence_count
+  #print("Average Number of Words Per Sentence = ",average_number_of_words_per_sentence )
+
+  #print("Complex Word Count = ",complex_word_count)
+  output.loc[rnum,'FOG INDEX']=fog_index
+  output.loc[rnum,'AVG NUMBER OF WORDS PER SENTENCE']=average_number_of_words_per_sentence
+  output.loc[rnum,'COMPLEX WORD COUNT']=complex_word_count
+
+  #removing puctuations
+
+  import nltk
+  from nltk.corpus import stopwords
+  from nltk.tokenize import word_tokenize
+
+  nltk.download('stopwords')
+  nltk.download('punkt')
+
+
+  # Tokenize the text into words
+  words = word_tokenize(text_content)
+
+  punctuation = ['?','!',',','.',':','-']
+
+  filtered_words=[word for word in words if word.lower() not in punctuation]
+  nopuctuatons_text=' '.join(filtered_words)
+  original_text=' '.join(words)
+
+  #print("Original text : ",original_text)
+  #print("Data after removing puctuations:", nopuctuatons_text)
+
+
+  #Removing stopwords
+  stop_words=set(stopwords.words('english'))
+
+  cleaned_text=[word for word in filtered_words if word.lower() not in stop_words]
+
+  #counting no of words in cleaned text
+  count_cleaneddata=0
+  count_cleaneddata = len(cleaned_text)
+
+  #print("no of words in clenaed data = ",count_cleaneddata)
+
+  cleaned_text=' '.join(cleaned_text)
+  uncleaned_text= nopuctuatons_text
+  #print("................................................................")
+ # print(" ")
+
+  #print("text after removing stopwords :", cleaned_text)
+  #print("................................................................")
+  #print(" ")
+
+  output.loc[rnum,'WORD COUNT']=count_cleaneddata
+
+
+  #Syllabel count per word
+  word_with_syllabel=0
+  cleaned_data = cleaned_text.split()
+  vowel=['a','e','i','o','u','A','E','I','O','U']
+  syllabel =[]
+  for i in cleaned_data :
+    syllable_count=0
+    if i.endswith("es")or i.endswith("ed"):
+      continue
+    else :
+      #checking how many vowels  in a word and incrementing the syllable count
+      for j in i:
+        if j in vowel:
+          syllable_count += 1
+      word_with_syllabel +=1
+      syllable_count_per_word=i+"-"+ str(syllable_count)
+      syllabel.append(syllable_count_per_word)
+  output.loc[rnum,'SYLLABLE PER WORD']=word_with_syllabel
+  #print(syllabel)
+  #print('word_with_syllabel = ',word_with_syllabel)
+
+
+  #personal Pronouns in uncleaned text
+
+  import re
+
+  def count_personal_pronouns(text):
+      # Define a regex pattern for personal pronouns
+      pronoun_pattern = r'\b(?:I|we|my|ours|us|We|My|Ours|Us)\b'
+
+      # Use re.findall to find all occurrences of the pattern in the text
+      pronouns_found = re.findall(pronoun_pattern, text)
+
+      # Count the occurrences of each pronoun
+      pronoun_counts = {pronoun.lower(): pronouns_found.count(pronoun) for pronoun in set(pronouns_found)}
+
+      return pronoun_counts
+
+
+  result = count_personal_pronouns(text_content)
+
+  # Print the result
+  #print("personal Pronouns in uncleaned text = ",result)
+
+
+  #personal Pronons in cleaned text
+
+  def count_personal_pronouns(text):
+      # Define a regex pattern for personal pronouns
+      pronoun_pattern = r'\b(?:I|we|my|ours|us|We|My|Ours|Us)\b'
+
+      # Use re.findall to find all occurrences of the pattern in the text
+      pronouns_found = re.findall(pronoun_pattern, text)
+
+      # Count the occurrences of each pronoun
+      pronoun_counts = {pronoun.lower(): pronouns_found.count(pronoun) for pronoun in set(pronouns_found)}
+
+      return pronoun_counts
+
+
+  # Call the function
+  result = count_personal_pronouns(cleaned_text)
+  sum_of_pronouns=sum(result.values())
+  # Print the result
+  #print("personal Pronons in cleaned text = ",result)
+ # print("sum of personal Pronons in cleaned text = ",sum_of_pronouns)
+
+
+  output.loc[rnum,'PERSONAL PRONOUN']=sum_of_pronouns
+
+  #Sum of the total number of characters in each word/Total number of words
+  character_count=0
+  for i in cleaned_data:
+    for j in i:
+      character_count +=1
+  #print("total no of characters = ",character_count)
+
+  average_word_length = character_count / word_count
+  #print("Average word length = ",average_word_length)
+
+
+  output.loc[rnum,'AVG WORD LENGTH']=average_word_length
+
+  """# ***Printing the output file***"""
+
+
+
+  """**to save the file**"""
+
+  output.to_csv(output_file_path, index=False)
+
+display(output.head(50))
+display(output.tail(50))
