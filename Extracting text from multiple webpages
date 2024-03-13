@@ -1,0 +1,27 @@
+import pandas as pd
+df=pd.read_csv("/content/Input.csv")
+
+
+df=df.dropna()
+display(df)
+
+import requests
+from bs4 import BeautifulSoup
+
+def extract(url):
+  response=requests.get(url)
+
+  if response.status_code==200:
+    soup=BeautifulSoup(response.text,'html.parser')
+    
+    text=soup.get_text(separator='\n',strip=True)
+
+    return text
+
+
+link=df.URL
+
+for i in link:
+  extracted_text=extract(i)
+
+  print(f"Text extracted from {i}:\n{extracted_text}\n{'='*50}")
